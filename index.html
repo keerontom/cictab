@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Compound">
+    <link rel="manifest" href="manifest.json">
+    <title>Compounding Interest Calculator — KT</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { height:100%; overflow:hidden }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+               background:#f2f2f7; display:flex; flex-direction:column; padding:8px 12px 0; height:100%; overflow:hidden; overscroll-behavior:none }
+        .hidden { display: none !important; }
+        .wrapper { display:flex; flex-direction:column; width:100%; height:100%; gap:6px; overflow:hidden; padding-bottom:58px }
+        .app-title { text-align:center; font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#4a5568; flex-shrink:0; line-height:1 }
+        .tabs { display:flex; width:100%; border-radius:9px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.12); flex-shrink:0 }
+        .tab-btn { flex:1; padding:10px 6px; background:#d1d5db; border:none; font-size:13px; font-weight:600; color:#4a5568; cursor:pointer; -webkit-tap-highlight-color:transparent }
+        .tab-btn.calc-tab { background:#e8eaed }
+        .tab-btn.ledger-tab { background:#d1d5db }
+        .tab-btn.defaults-tab { background:#c5cad4 }
+        .tab-btn.active { background:#4a5568; color:#fff }
+        .reset-btn { width:42px; min-width:42px; background:#b0b7c3; border:none; font-size:18px; color:#fff; cursor:pointer; -webkit-tap-highlight-color:transparent }
+        .tab-content { display:flex; flex-direction:column; gap:10px; flex:1; overflow-y:auto; overflow-x:hidden }
+        .tab-content.hidden { display:none }
+        .scenario-bar { position:fixed; bottom:0; left:0; right:0; height:48px; display:flex; box-shadow:0 -2px 8px rgba(0,0,0,.12); z-index:100 }
+        .scenario-btn { flex:1; border:none; font-size:12px; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent }
+        .scenario-btn[data-scenario="working"]       { background:#c8d8e8; color:#2c5f8a }
+        .scenario-btn[data-scenario="preretirement"] { background:#c8e8d0; color:#2c6b45 }
+        .scenario-btn[data-scenario="retirement"]    { background:#e8d8c8; color:#7a4a2c }
+        .scenario-btn.active { background:#4a5568; color:#fff }
+        .card { background:#fff; border-radius:12px; overflow:hidden; width:100%; box-shadow:0 1px 6px rgba(0,0,0,.1); flex-shrink:0 }
+        .card-header { background:#4a5568; color:#fff; font-size:12px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; padding:10px 14px }
+        .card-header.defaults-header { background:#2d3748 }
+        .input-table { width:100%; border-collapse:collapse; table-layout:fixed }
+        .input-table tr { border-bottom:1px solid #e8e8ec }
+        .input-table tr:last-child { border-bottom:none }
+        .input-table td { padding:9px 12px; vertical-align:middle }
+        td.label-cell { font-size:15px; color:#1c1c1e; white-space:nowrap; width:40% }
+        td.control-cell { width:60%; text-align:right }
+        .controls { display:flex; align-items:center; justify-content:flex-end; gap:5px; width:100% }
+        .input-box { border:1.5px solid #d1d1d6; border-radius:9px; padding:7px 8px; font-size:16px; text-align:right; color:#1c1c1e; background:#fff; outline:none; height:36px; width:100%; min-width:0; -webkit-appearance:none }
+        .input-box:focus { border-color:#4a5568 }
+        .input-box.medium { flex:1; width:auto }
+        select.input-box { appearance:none; -webkit-appearance:none; text-align-last:right; padding-right:6px }
+        .pm-btn { width:36px; min-width:36px; height:36px; border-radius:9px; border:1.5px solid #68d391; background:#f0fff4; font-size:18px; color:#2c7a4b; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; user-select:none; -webkit-tap-highlight-color:transparent }
+        .pm-btn.negative { background:#fff0f0; border-color:#e57373; color:#c0392b }
+        .result-row { display:flex; justify-content:space-between; align-items:center; padding:11px 14px; border-bottom:1px solid #e8e8ec }
+        .result-row:last-child { border-bottom:none }
+        .result-label { font-size:14px; color:#636366 }
+        .result-value { font-size:15px; font-weight:600; color:#1c1c1e }
+        .result-value.highlight { color:#2c7a4b; font-size:18px }
+        .ledger-wrap { width:100%; background:#fff; border-radius:12px; overflow-y:auto; max-height:calc(100vh - 160px); box-shadow:0 1px 6px rgba(0,0,0,.1) }
+        .ledger-header { background:#4a5568; color:#fff; font-size:12px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; padding:10px 14px }
+        .ledger-table { width:100%; border-collapse:collapse }
+        .ledger-table thead tr { border-bottom:1px solid #d1d1d6 }
+        .ledger-table thead th { padding:6px 12px; font-size:11px; font-weight:600; color:#8e8e93; text-transform:uppercase; letter-spacing:0.04em; line-height:1.4 }
+        .ledger-table thead th:first-child { text-align:left }
+        .ledger-table thead th:nth-child(2) { text-align:center }
+        .ledger-table thead th:last-child { text-align:right }
+        .row-top td { padding:5px 12px 1px; border-top:1px solid #e8e8ec; font-size:13px; color:#1c1c1e }
+        .row-bot td { padding:1px 12px 5px; font-size:13px; color:#1c1c1e }
+        .year-num { font-size:14px; font-weight:600; color:#4a5568; text-align:left; vertical-align:middle }
+        .center-col { text-align:center }
+        .right-col { text-align:right }
+        .right-col.ending { font-weight:600 }
+        .ledger-table tfoot td { padding:8px 12px; border-top:2px solid #4a5568; font-weight:700; font-size:13px }
+        .ledger-table tfoot td:first-child { text-align:left; color:#4a5568 }
+        .defaults-actions { display:flex; gap:10px; width:100%; padding:4px 0 0 }
+        .action-btn { flex:1; height:42px; border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer }
+        .action-btn.save  { background:#2d3748; color:#fff }
+        .action-btn.apply { background:#68d391; color:#1c4731 }
+        .disabled-msg { text-align:center; padding:30px 14px; color:#8e8e93; font-size:14px; font-style:italic }
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0 }
+        input[type=number] { -moz-appearance:textfield }
+    </style>
+</head>
+<body>
+    <div class="app-title">Compounding Interest Calculator — KT</div>
+    <div class="wrapper">
+
+        <!-- TOP TABS -->
+        <div class="tabs">
+            <button class="tab-btn calc-tab active"  onclick="switchTopTab('calculator')">Calculator</button>
+            <button class="tab-btn ledger-tab"       onclick="switchTopTab('ledger')">Ledger</button>
+            <button class="tab-btn defaults-tab"     onclick="switchTopTab('defaults')">Defaults</button>
+            <button class="reset-btn"                onclick="resetCalculator()">↺</button>
+        </div>
+
+        <!-- CALCULATOR PANEL -->
+        <div id="panel-calculator" class="tab-content">
+            <div class="card">
+                <div class="card-header">Calculator</div>
+                <table class="input-table">
+                    <tr>
+                        <td class="label-cell">Principal</td>
+                        <td class="control-cell">
+                            <input type="text" id="principal" class="input-box" inputmode="decimal">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Interest %</td>
+                        <td class="control-cell">
+                            <input type="number" id="rate" class="input-box" step="0.25" inputmode="decimal">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Compounding</td>
+                        <td class="control-cell">
+                            <select id="compound" class="input-box">
+                                <option value="1">Annually</option>
+                                <option value="2">Semi-Annually</option>
+                                <option value="4">Quarterly</option>
+                                <option value="12" selected>Monthly</option>
+                                <option value="365">Daily</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Duration (Yrs)</td>
+                        <td class="control-cell">
+                            <input type="number" id="duration" class="input-box" step="1" inputmode="numeric">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Additions</td>
+                        <td class="control-cell">
+                            <div class="controls">
+                                <button class="pm-btn" id="pm-btn" onclick="toggleAdditionSign()">+</button>
+                                <input type="text" id="addition" class="input-box medium" inputmode="decimal">
+                                <select id="addFreq" class="input-box medium">
+                                    <option value="1">Ann.</option>
+                                    <option value="2">Semi-Ann.</option>
+                                    <option value="4">Qtrly.</option>
+                                    <option value="12" selected>Monthly</option>
+                                    <option value="365">Daily</option>
+                                </select>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Add at</td>
+                        <td class="control-cell">
+                            <select id="addTiming" class="input-box">
+                                <option value="start">Start of period</option>
+                                <option value="end" selected>End of period</option>
+                            </select>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="card">
+                <div class="card-header">Results</div>
+                <div class="result-row">
+                    <span class="result-label">Total Additions / Subtractions</span>
+                    <span id="res-additions" class="result-value">$0.00</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">Total Interest Earned</span>
+                    <span id="res-interest" class="result-value">$0.00</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">Ending Balance</span>
+                    <span id="res-ending" class="result-value highlight">$0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- LEDGER PANEL -->
+        <div id="panel-ledger" class="tab-content hidden">
+            <div class="ledger-wrap">
+                <div class="ledger-header" id="ledger-title">5 YEARS</div>
+                <table class="ledger-table">
+                    <thead>
+                        <tr>
+                            <th>Year</th>
+                            <th class="center-col">Additions<br>Interest</th>
+                            <th class="right-col">Beg. Balance<br>End. Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ledger-body"></tbody>
+                    <tfoot id="ledger-foot">
+                        <tr>
+                            <td>Total</td>
+                            <td class="center-col">—</td>
+                            <td class="right-col">—</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- DEFAULTS PANEL -->
+        <div id="panel-defaults" class="tab-content hidden">
+            <div class="card" id="defaults-card">
+                <div class="card-header defaults-header">Defaults</div>
+                <table class="input-table">
+                    <tr>
+                        <td class="label-cell">Principal</td>
+                        <td class="control-cell">
+                            <input type="text" id="def-principal" class="input-box" inputmode="decimal">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Interest %</td>
+                        <td class="control-cell">
+                            <input type="number" id="def-rate" class="input-box" step="0.25" inputmode="decimal">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Compounding</td>
+                        <td class="control-cell">
+                            <select id="def-compound" class="input-box">
+                                <option value="1">Annually</option>
+                                <option value="2">Semi-Annually</option>
+                                <option value="4">Quarterly</option>
+                                <option value="12" selected>Monthly</option>
+                                <option value="365">Daily</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Duration (Yrs)</td>
+                        <td class="control-cell">
+                            <input type="number" id="def-duration" class="input-box" step="1" inputmode="numeric">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Additions</td>
+                        <td class="control-cell">
+                            <div class="controls">
+                                <button class="pm-btn" id="def-pm-btn" onclick="toggleDefaultAdditionSign()">+</button>
+                                <input type="text" id="def-addition" class="input-box medium" inputmode="decimal">
+                                <select id="def-addFreq" class="input-box medium">
+                                    <option value="1">Ann.</option>
+                                    <option value="2">Semi-Ann.</option>
+                                    <option value="4">Qtrly.</option>
+                                    <option value="12" selected>Monthly</option>
+                                    <option value="365">Daily</option>
+                                </select>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Add at</td>
+                        <td class="control-cell">
+                            <select id="def-addTiming" class="input-box">
+                                <option value="start">Start of period</option>
+                                <option value="end" selected>End of period</option>
+                            </select>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="defaults-actions" id="defaults-actions">
+                <button class="action-btn save"  onclick="saveDefaults()">💾 Save Defaults</button>
+                <button class="action-btn apply" onclick="applyDefaults(true)">↺ Apply to Calc</button>
+            </div>
+            <div id="defaults-disabled-msg" class="disabled-msg hidden">
+                Defaults apply to Working Years only.
+            </div>
+        </div>
+
+    </div><!-- end .wrapper -->
+
+    <!-- BOTTOM SCENARIO TABS -->
+    <div class="scenario-bar">
+        <button data-scenario="working"       class="scenario-btn active" onclick="switchScenario('working')">Working Years</button>
+        <button data-scenario="preretirement" class="scenario-btn"        onclick="switchScenario('preretirement')">Pre-Retirement</button>
+        <button data-scenario="retirement"    class="scenario-btn"        onclick="switchScenario('retirement')">Retirement</button>
+    </div>
+
+    <script>
+        /* ── helpers ── */
+        function fmt(n) {
+            return isNaN(n) ? "$0.00" : n.toLocaleString("en-CA", { style:"currency", currency:"CAD" });
+        }
+        function getField(id) {
+            return parseFloat((document.getElementById(id).value || "0").replace(/,/g,"").replace(/\$/g,"")) || 0;
+        }
+
+        /* ── state ── */
+        var activeScenario = "working";
+        var scenarioData = {
+            working:       { principal:"1,070,000", rate:"7.00", compound:"12", duration:"5",  addition:"625", addFreq:"12", addTiming:"end", addSign:1 },
+            preretirement: { principal:"",           rate:"7.00", compound:"12", duration:"5",  addition:"625", addFreq:"12", addTiming:"end", addSign:1, visited:false },
+            retirement:    { principal:"",           rate:"7.00", compound:"12", duration:"5",  addition:"625", addFreq:"12", addTiming:"end", addSign:1, visited:false }
+        };
+        var endingBalances = { working:0, preretirement:0, retirement:0 };
+
+        /* ── scenario switching ── */
+        function switchScenario(newScenario) {
+            saveScenarioData();
+            var prevScenario = activeScenario;
+            activeScenario = newScenario;
+            if (!scenarioData[newScenario].visited) {
+                var raw = endingBalances[prevScenario] || 0;
+                scenarioData[newScenario].principal = raw.toLocaleString("en-CA", { maximumFractionDigits:2 });
+                scenarioData[newScenario].visited = true;
+            }
+            loadScenarioData(newScenario);
+            updateScenarioTabs();
+            updateDefaultsPanel();
+            calculate();
+        }
+
+        function updateScenarioTabs() {
+            document.querySelectorAll(".scenario-btn").forEach(function(b) { b.classList.remove("active"); });
+            document.querySelector('[data-scenario="' + activeScenario + '"]').classList.add("active");
+        }
+
+        /* ── top tab switching ── */
+        function switchTopTab(name) {
+            document.querySelectorAll(".tab-content").forEach(function(p) { p.classList.add("hidden"); });
+            document.getElementById("panel-" + name).classList.remove("hidden");
+            document.querySelectorAll(".tab-btn").forEach(function(b) { b.classList.remove("active"); });
+            var cls = name === "calculator" ? ".calc-tab" : name === "ledger" ? ".ledger-tab" : ".defaults-tab";
+            document.querySelector(cls).classList.add("active");
+            if (name === "defaults") updateDefaultsPanel();
+        }
+
+        /* ── defaults panel visibility ── */
+        function updateDefaultsPanel() {
+            var isWorking = (activeScenario === "working");
+            document.getElementById("defaults-card").classList.toggle("hidden", !isWorking);
+            document.getElementById("defaults-actions").classList.toggle("hidden", !isWorking);
+            document.getElementById("defaults-disabled-msg").classList.toggle("hidden", isWorking);
+        }
+
+        /* ── calculation ── */
+        function calculate() {
+            var P       = getField("principal");
+            var r       = (parseFloat(document.getElementById("rate").value) || 0) / 100;
+            var n       = parseInt(document.getElementById("compound").value) || 1;
+            var t       = parseInt(document.getElementById("duration").value) || 0;
+            var addSign = document.getElementById("pm-btn").classList.contains("negative") ? -1 : 1;
+            var pmt     = getField("addition") * addSign;
+            var pmtFreq = parseInt(document.getElementById("addFreq").value) || 12;
+            var timing  = document.getElementById("addTiming").value;
+
+            var ratePerPeriod = r / n;
+            var pmtPerPeriod  = pmt * pmtFreq / n;
+            var balance       = P;
+            var totalAdditions = 0;
+            var totalInterest  = 0;
+            var ledgerHTML     = "";
+
+            for (var year = 1; year <= t; year++) {
+                var opening      = balance;
+                var yearAdd      = 0;
+                var yearInt      = 0;
+                for (var p = 0; p < n; p++) {
+                    var interest;
+                    if (timing === "start") {
+                        balance  += pmtPerPeriod;
+                        yearAdd  += pmtPerPeriod;
+                        interest  = balance * ratePerPeriod;
+                        balance  += interest;
+                        yearInt  += interest;
+                    } else {
+                        interest  = balance * ratePerPeriod;
+                        balance  += interest;
+                        yearInt  += interest;
+                        balance  += pmtPerPeriod;
+                        yearAdd  += pmtPerPeriod;
+                    }
+                }
+                totalAdditions += yearAdd;
+                totalInterest  += yearInt;
+                ledgerHTML +=
+                    '<tr class="row-top">' +
+                        '<td class="year-num" rowspan="2">' + year + '.</td>' +
+                        '<td class="center-col">' + fmt(yearAdd) + '</td>' +
+                        '<td class="right-col">'  + fmt(opening) + '</td>' +
+                    '</tr>' +
+                    '<tr class="row-bot">' +
+                        '<td class="center-col">'       + fmt(yearInt)  + '</td>' +
+                        '<td class="right-col ending">' + fmt(balance)  + '</td>' +
+                    '</tr>';
+            }
+
+            document.getElementById("res-additions").textContent = fmt(totalAdditions);
+            document.getElementById("res-interest").textContent  = fmt(totalInterest);
+            document.getElementById("res-ending").textContent    = fmt(balance);
+            document.getElementById("ledger-title").textContent  = t + " YEARS";
+            document.getElementById("ledger-body").innerHTML     = ledgerHTML;
+            document.getElementById("ledger-foot").innerHTML     =
+                '<tr>' +
+                    '<td>Total</td>' +
+                    '<td class="center-col">' + fmt(totalAdditions + totalInterest) + '</td>' +
+                    '<td class="right-col">'  + fmt(balance) + '</td>' +
+                '</tr>';
+
+            endingBalances[activeScenario] = balance;
+            saveScenarioData();
+        }
+
+        /* ── save / load scenario ── */
+        function saveScenarioData() {
+            var d = scenarioData[activeScenario];
+            d.principal = document.getElementById("principal").value;
+            d.rate      = document.getElementById("rate").value;
+            d.compound  = document.getElementById("compound").value;
+            d.duration  = document.getElementById("duration").value;
+            d.addition  = document.getElementById("addition").value;
+            d.addFreq   = document.getElementById("addFreq").value;
+            d.addTiming = document.getElementById("addTiming").value;
+            d.addSign   = document.getElementById("pm-btn").classList.contains("negative") ? -1 : 1;
+            localStorage.setItem(activeScenario + "_data", JSON.stringify(d));
+        }
+
+        function loadScenarioData(scenario) {
+            var d = scenarioData[scenario];
+            document.getElementById("principal").value = d.principal;
+            document.getElementById("rate").value      = d.rate;
+            document.getElementById("compound").value  = d.compound;
+            document.getElementById("duration").value  = d.duration;
+            document.getElementById("addition").value  = d.addition;
+            document.getElementById("addFreq").value   = d.addFreq;
+            document.getElementById("addTiming").value = d.addTiming;
+            var btn = document.getElementById("pm-btn");
+            var isNeg = (d.addSign === -1);
+            btn.classList.toggle("negative", isNeg);
+            btn.textContent = isNeg ? "−" : "+";
+        }
+
+        /* ── pm-btn toggles ── */
+        function toggleAdditionSign() {
+            var btn = document.getElementById("pm-btn");
+            var nowNeg = btn.classList.toggle("negative");
+            btn.textContent = nowNeg ? "−" : "+";
+            calculate();
+        }
+        function toggleDefaultAdditionSign() {
+            var btn = document.getElementById("def-pm-btn");
+            btn.textContent = btn.classList.toggle("negative") ? "−" : "+";
+        }
+
+        /* ── format fields ── */
+        function formatField(id) {
+            var el  = document.getElementById(id);
+            var num = parseFloat((el.value || "0").replace(/,/g,"").replace(/\$/g,"")) || 0;
+            el.value = num.toLocaleString("en-CA", { maximumFractionDigits:2 });
+            calculate();
+        }
+
+        /* ── defaults ── */
+        var FALLBACK = { principal:"1,070,000", rate:"7.00", compound:"12", duration:"5", addition:"625", addFreq:"12", addTiming:"end", addSign:1 };
+
+        function loadDefaultsIntoPanel() {
+            var d = JSON.parse(localStorage.getItem("calcDefaults")) || FALLBACK;
+            document.getElementById("def-principal").value = d.principal;
+            document.getElementById("def-rate").value      = d.rate;
+            document.getElementById("def-compound").value  = d.compound;
+            document.getElementById("def-duration").value  = d.duration;
+            document.getElementById("def-addition").value  = d.addition;
+            document.getElementById("def-addFreq").value   = d.addFreq;
+            document.getElementById("def-addTiming").value = d.addTiming;
+            var btn = document.getElementById("def-pm-btn");
+            var isNeg = (d.addSign === -1);
+            btn.classList.toggle("negative", isNeg);
+            btn.textContent = isNeg ? "−" : "+";
+        }
+
+        function saveDefaults() {
+            var config = {
+                principal: document.getElementById("def-principal").value,
+                rate:      document.getElementById("def-rate").value,
+                compound:  document.getElementById("def-compound").value,
+                duration:  document.getElementById("def-duration").value,
+                addition:  document.getElementById("def-addition").value,
+                addFreq:   document.getElementById("def-addFreq").value,
+                addTiming: document.getElementById("def-addTiming").value,
+                addSign:   document.getElementById("def-pm-btn").classList.contains("negative") ? -1 : 1
+            };
+            localStorage.setItem("calcDefaults", JSON.stringify(config));
+            var btn = document.querySelector(".action-btn.save");
+            btn.textContent = "✓ Saved!";
+            setTimeout(function() { btn.textContent = "💾 Save Defaults"; }, 1500);
+        }
+
+        function applyDefaults(switchToCalc) {
+            var d = JSON.parse(localStorage.getItem("calcDefaults")) || FALLBACK;
+            document.getElementById("principal").value = d.principal;
+            document.getElementById("rate").value      = d.rate;
+            document.getElementById("compound").value  = d.compound;
+            document.getElementById("duration").value  = d.duration;
+            document.getElementById("addition").value  = d.addition;
+            document.getElementById("addFreq").value   = d.addFreq;
+            document.getElementById("addTiming").value = d.addTiming;
+            var btn = document.getElementById("pm-btn");
+            var isNeg = (d.addSign === -1);
+            btn.classList.toggle("negative", isNeg);
+            btn.textContent = isNeg ? "−" : "+";
+            calculate();
+            if (switchToCalc) switchTopTab("calculator");
+        }
+
+        function resetCalculator() {
+            if (activeScenario === "working") applyDefaults(true);
+        }
+
+        /* ── init ── */
+        document.addEventListener("DOMContentLoaded", function() {
+
+            // Restore any previously saved scenario data
+            ["working","preretirement","retirement"].forEach(function(s) {
+                var raw = localStorage.getItem(s + "_data");
+                if (raw) scenarioData[s] = JSON.parse(raw);
+            });
+
+            loadDefaultsIntoPanel();
+            switchTopTab("calculator");
+            loadScenarioData("working");
+            calculate();
+
+            // Grey-out UX on all inputs
+            document.querySelectorAll("input").forEach(function(input) {
+                var savedValue = "";
+                var cleared = false;
+                input.addEventListener("focus", function() {
+                    savedValue = input.value;
+                    cleared = false;
+                    input.style.color = "#c0c0c8";
+                });
+                input.addEventListener("keydown", function() {
+                    if (!cleared) {
+                        cleared = true;
+                        input.value = "";
+                        input.style.color = "#1c1c1e";
+                    }
+                });
+                input.addEventListener("blur", function() {
+                    input.style.color = "#1c1c1e";
+                    if (input.value.trim() === "") {
+                        input.value = savedValue;
+                        calculate();
+                    }
+                });
+            });
+
+            // Calculator input listeners
+            document.getElementById("principal").addEventListener("input", calculate);
+            document.getElementById("principal").addEventListener("blur",  function() { formatField("principal"); });
+            document.getElementById("addition").addEventListener("input",  calculate);
+            document.getElementById("addition").addEventListener("blur",   function() { formatField("addition"); });
+            document.getElementById("rate").addEventListener("blur", function() {
+                var v = parseFloat(this.value);
+                this.value = isNaN(v) ? "0.00" : v.toFixed(2);
+                calculate();
+            });
+            document.getElementById("compound").addEventListener("change",  calculate);
+            document.getElementById("duration").addEventListener("input",   calculate);
+            document.getElementById("addFreq").addEventListener("change",   calculate);
+            document.getElementById("addTiming").addEventListener("change", calculate);
+
+            // Defaults input listeners
+            document.getElementById("def-principal").addEventListener("blur", function() { formatField("def-principal"); });
+            document.getElementById("def-addition").addEventListener("blur",  function() { formatField("def-addition"); });
+            document.getElementById("def-rate").addEventListener("blur", function() {
+                var v = parseFloat(this.value);
+                this.value = isNaN(v) ? "0.00" : v.toFixed(2);
+            });
+        });
+    </script>
+</body>
+</html>
